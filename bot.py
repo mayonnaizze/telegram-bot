@@ -110,44 +110,45 @@ async def handle_message(message: types.Message):
         reaction = choose_reaction(text)
         await bot.set_message_reaction(
             chat_id=message.chat.id,
-...             message_id=message.message_id,
-...             reaction=[MessageReactionTypeEmoji(emoji=reaction)]
-...         )
-...     except:
-...         pass
-... 
-...     # Показывает "печатает..."
-...     await bot.send_chat_action(message.chat.id, "typing")
-... 
-...     # Задержка перед ответом
-...     await asyncio.sleep(random.randint(2, 5))
-... 
-...     # Память
-...     if user_id not in memory:
-...         memory[user_id] = [{"role": "system", "content": SYSTEM_PROMPT}]
-... 
-...     memory[user_id].append({"role": "user", "content": text})
-...     memory[user_id] = memory[user_id][-12:]
-... 
-...     # Ответ DeepSeek
-...     try:
-...         reply = await ask_deepseek(memory[user_id])
-...     except Exception as e:
-...         print("Ошибка DeepSeek:", e)
-...         reply = "что-то сломалось 💀"
-... 
-...     memory[user_id].append({"role": "assistant", "content": reply})
-... 
-...     await message.reply(reply)
-... 
-... # =========================
-... # Запуск
-... # =========================
-... 
-... async def main():
-...     print("Бот запущен...")
-...     await dp.start_polling(bot)
-... 
-... if __name__ == "__main__":
+             message_id=message.message_id,
+             reaction=[MessageReactionTypeEmoji(emoji=reaction)]
+         )
+     except:
+         pass
+ 
+     # Показывает "печатает..."
+     await bot.send_chat_action(message.chat.id, "typing")
+ 
+     # Задержка перед ответом
+     await asyncio.sleep(random.randint(2, 5))
+ 
+     # Память
+     if user_id not in memory:
+         memory[user_id] = [{"role": "system", "content": SYSTEM_PROMPT}]
+ 
+     memory[user_id].append({"role": "user", "content": text})
+     memory[user_id] = memory[user_id][-12:]
+ 
+     # Ответ DeepSeek
+     try:
+         reply = await ask_deepseek(memory[user_id])
+     except Exception as e:
+         print("Ошибка DeepSeek:", e)
+         reply = "что-то сломалось 💀"
+ 
+     memory[user_id].append({"role": "assistant", "content": reply})
+ 
+     await message.reply(reply)
+ 
+ # =========================
+ # Запуск
+ # =========================
+ 
+ async def main():
+     print("Бот запущен...")
+     await dp.start_polling(bot)
+ 
+ if __name__ == "__main__":
+
 
 
