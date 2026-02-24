@@ -4,7 +4,6 @@ import os
 import aiohttp
 from dotenv import load_dotenv
 from aiogram import Bot, Dispatcher, types
-from aiogram.types import MessageReactionTypeEmoji
 
 # Загружаем переменные из .env
 load_dotenv()
@@ -68,22 +67,6 @@ async def ask_deepseek(messages):
             return result["choices"][0]["message"]["content"]
 
 # =========================
-# Реакции
-# =========================
-
-def choose_reaction(text):
-    text = text.lower()
-
-    if any(word in text for word in ["love", "cute", "cool"]):
-        return "❤️"
-    elif any(word in text for word in ["sad", "bad", "depress"]):
-        return "😢"
-    elif "?" in text:
-        return "🤔"
-    else:
-        return random.choice(["👀", "🔥", "✨", "💀"])
-
-# =========================
 # Обработка сообщений
 # =========================
 
@@ -98,23 +81,13 @@ async def handle_message(message: types.Message):
 
     # В группах реагирует только если упомянули
     if message.chat.type in ["group", "supergroup"]:
-        if BOT_USERNAME and f"@{BOT_USERNAME}" not in text:
+        if renhanairlest_bot and f"@{renhanairlest_bot}" not in text:
             return
 
     # 20% шанс игнора (человечность)
     if random.random() < 0.2:
         return
 
-    # Ставим реакцию
-    try:
-        reaction = choose_reaction(text)
-        await bot.set_message_reaction(
-            chat_id=message.chat.id,
-            message_id=message.message_id,
-            reaction=[MessageReactionTypeEmoji(emoji=reaction)]
-        )
-    except Exception:
-        pass
 
     await bot.send_chat_action(message.chat.id, "typing")
     await asyncio.sleep(random.randint(2, 5))
@@ -141,3 +114,4 @@ async def main():
 
 if __name__ == "__main__":
     asyncio.run(main())
+
