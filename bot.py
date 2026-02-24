@@ -14,8 +14,8 @@ load_dotenv()
 
 BOT_TOKEN = os.getenv("BOT_TOKEN")
 DEEPSEEK_API_KEY = os.getenv("DEEPSEEK_API_KEY")
-HF_API_KEY = os.getenv("HF_API_KEY")
 BOT_USERNAME = os.getenv("BOT_USERNAME")
+OPENAI_API_KEY = os.getenv("OPENAI_API_KEY")
 
 if not BOT_TOKEN:
     raise ValueError("Нет BOT_TOKEN в .env")
@@ -155,42 +155,74 @@ async def handle_group_by_keyword(message: Message):
         print("DeepSeek error:", e)
         reply = "что-то сломалось 💀"
 
-# --- Функция обращения к HuggingFace для фото ---
-async def analyze_image_hf(image_bytes):
-    hf_api_url = "https://api-inference.huggingface.co/models/Salesforce/blip2-flan-t5-xl"
-    headers = {"Authorization": f"Bearer {HF_API_KEY}"}
-    payload = {
-        "inputs": {
-            "image": base64.b64encode(image_bytes).decode(),
-            "task": "image-captioning"
-        }
+    memory[user_id].append({"role": "assistant", "content": reply})
+
+    await message.reply(reply)
+async def analyze_image_openai(image_bytes):
+    """
+    Отправка фото на OpenAI для генерации описания
+    """
+    import json
+    import aiohttp
+
+    url = "https://api.openai.com/v1/responses"  # новый endpoint для мультимодальных моделей
+    headers = {
+        "Authorization": f"Bearer {OPENAI_API_KEY}",
+        "Content-Type": "application/json"
     }
+
+    # Кодируем фото в base64
+    encoded_image = base64.b64encode(image_bytes).decode()
+
+    payload = {
+        "model": "gpt-4.1-mini",  # или gpt-4v если доступна
+        "input": [
+            {
+                "role": "user",
+                "content": [
+                    {"type": "input_text", "text": "Опиши это изображение"},
+                    {"type": "input_image", "image_data": encoded_image}
+                ]
+            }
+        ]
+    }
+
     async with aiohttp.ClientSession() as session:
-        async with session.post(hf_api_url, headers=headers, json=payload) as resp:
+        async with session.post(url, headers=headers, data=json.dumps(payload)) as resp:
             result = await resp.json()
-            if isinstance(result, dict) and result.get("error"):
+            try:
+                return result["output_text"]  # текстовое описание картинки
+            except:
                 return "не смог распознать изображение 😅"
-            return result[0]["generated_text"]
 
-# --- Универсальный хендлер для текста и фото ---
-@dp.message()
-async def handle_message_universal(message: Message):
+@dp.message(lambda message: message.photo)
+async def handle_photo_openai(message: Message):
+    """
+    Хендлер для обработки фото через OpenAI и отправки текста в DeepSeek
+    """
     user_id = message.from_user.id
-    text = message.text if message.text else ""
-    photo_bytes = None
 
-    # --- Обработка фото ---
-    if message.photo:
-        photo = message.photo[-1]
-        file = await bot.get_file(photo.file_id)
-        file_url = f"https://api.telegram.org/file/bot{BOT_TOKEN}/{file.file_path}"
-        async with aiohttp.ClientSession() as session:
-            async with session.get(file_url) as resp:
-                photo_bytes = await resp.read()
-        # Отправляем фото на анализ HuggingFace
-        description = await analyze_image_hf(photo_bytes)
-        text = f"[Фото]: {description}" + (" " + text if text else "")
+    # Скачиваем фото с Telegram
+    photo = message.photo[-1]
+    file = await bot.get_file(photo.file_id)
+    file_url = f"https://api.telegram.org/file/bot{BOT_TOKEN}/{file.file_path}"
 
+    async with aiohttp.ClientSession() as session:
+        async with session.get(file_url) as resp:
+            image_bytes = await resp.read()
+
+    # Отправляем фото на OpenAI
+    description = await analyze_image_openai(image_bytes)
+    text_for_memory = f"[Фото]: {description}"
+
+    # Добавляем в память DeepSeek
+    if user_id not in memory:
+        memory[user_id] = [{"role": "system", "content": SYSTEM_PROMPT}]
+    memory[user_id].append({"role": "user", "content": text_for_memory})
+    memory[user_id] = memory[user_id][-12:]
+
+    # Отправляем в DeepSeek
+    reply = await ask_deepseek(memory[user_id])
     memory[user_id].append({"role": "assistant", "content": reply})
 
     await message.reply(reply)
