@@ -5,6 +5,9 @@ import aiohttp
 from dotenv import load_dotenv
 from aiogram import Bot, Dispatcher, types
 from aiogram.types import Message
+import base64
+import aiohttp
+from aiogram.types import Message
 
 # Загружаем переменные из .env
 load_dotenv()
@@ -154,3 +157,52 @@ async def handle_group_by_keyword(message: Message):
     memory[user_id].append({"role": "assistant", "content": reply})
 
     await message.reply(reply)
+
+@dp.message(lambda message: message.photo)
+async def handle_photo(message: Message):
+    try:
+        # Берём фото самого высокого качества
+        photo = message.photo[-1]
+        
+        # Получаем файл
+        file = await bot.get_file(photo.file_id)
+        file_path = file.file_path
+
+        # Скачиваем файл
+        file_url = f"https://api.telegram.org/file/bot{BOT_TOKEN}/{file_path}"
+        
+        async with aiohttp.ClientSession() as session:
+            async with session.get(file_url) as resp:
+                image_bytes = await resp.read()
+
+        # Кодируем в base64
+        base64_image = base64.b64encode(image_bytes).decode("utf-8")
+
+        # Отправляем в DeepSeek
+        response = client.chat.completions.create(
+            model="deepseek-chat",  # заменить на vision модель если есть
+            messages=[
+                {
+                    "role": "system",
+                    "content": system_prompt
+                },
+                {
+                    "role": "user",
+                    "content": [
+                        {"type": "text", "text": "Опиши это изображение"},
+                        {
+                            "type": "image_url",
+                            "image_url": {
+                                "url": f"data:image/jpeg;base64,{base64_image}"
+                            }
+                        }
+                    ]
+                }
+            ]
+        )
+
+        reply = response.choices[0].message.content
+        await message.answer(reply)
+
+    except Exception as e:
+        await message.answer("Ошибка при обработке изображения: " + str(e))
