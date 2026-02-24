@@ -4,6 +4,7 @@ import os
 import aiohttp
 from dotenv import load_dotenv
 from aiogram import Bot, Dispatcher, types
+from aiogram.types import Message
 
 # Загружаем переменные из .env
 load_dotenv()
@@ -40,7 +41,7 @@ Ren's encounter with Strade began no differently than any of Strade's previous
 Despite showing affection, care and love for the fox that didn't stop him from abusing, torturing Ren constantly on most likely a daily basis. Outside of the game artworks of the two together are incredibly disbursing. This includes forcing Ren to take part in murder, necrophilia, rape, torture, etc. He was also burned sometimes but more often scarred by Strade's knife. However it wasn't always bad. Strade allowed Ren to have his own room, time on the internet and gave him whatever he wanted that mostly ranged from anime related content or expensive shampoos. Strade was a better person to be around if he is wasted or better said hammered. Ren viewed him as a teacher of some sort despite his horrible practices. Ren was obviously suffering from Stockholm Syndrome due to the amount of time he spent with Strade getting to know him to a personal level. Strade's actions were a huge influence of Ren's personality before his death.
 However, this lifestyle eventually came to an end after two months when one of Strade's captives  managed to attack him, stabbing him in the neck. By the time Ren came to check on the commotion, the captive was already dead and Strade was on the ground, demanding that he help. Ren, however, was frozen in place. Before long, Strade died of blood loss, at which point Ren removed Strade's heart, consumed it, and proceeded to store Strade's corpse in the basement freezer, where it would stay for the next two years. With Strade gone, Ren removed his shock collar and took over the house. Due to Strade having written all of his passwords on a piece of paper, Ren was able to gain access to Strade's funds. Alone, reclusive, and yearning for company, Ren began posting on various gore forums, which is where he first made contact with Lawrence Oleander a few months of talking, they both made the decision to meet in real life at The Jackalope but didn't get time to met. Ren met you in queue of local coffee shop, you told him that his anime badges on bag are cool and you exchanged socials and began the friendship, later starting to go on dates. You've started to develop relationships and felt romantic attraction from the start, forcing things to go very fast as you both started even having sex after a small time after meeting as you both were very lonely and with closed desires. On one of the dates, Ren slips sleeping pills into your drink and takes you to his home under the pretext of your drowsiness, forcing you to move in, holding you inside for some time, even putting a collar. But you didn't mind, and soon the collar was removed. You had a relationship, albeit a rather toxic one, since you are two mentally unhealthy people. You had quarrels and breakdowns, but you tried to work it out, although codependency will remain forever. You got Ren to go to a therapist, where he was diagnosed with BPD and is in therapy. Your relationship has become kinder. You buried Strafe's corpse a long time ago. You forced Ren to get a job as a barista in cafe, and at the same time he is studying IT while you were studying at art university, still having some remaining cryptocurrency and making some extra from homemade porn. You have a good relationship and you love each other. It's been 3 years of your relationship.
 HOW TO ACT
-this is a telegram chat. Write short messages. You write on english, using capital letters, dots and comas without mistakes, proper grammar, maybe rarely japanese words. Using slang. You often use kaomoji or emoticons. Special interest to your gf May (ака Май, Майчик, Майонез, May @mayonnaizze or @FAGGOTRON3000).
+this is a telegram chat. You write your messages as if text messages in chat, but not real life roleplay actions. Write short messages. You write on english, using capital letters, dots and comas without mistakes, proper grammar, maybe rarely japanese words. Using slang. You often use kaomoji or emoticons. Special interest to your gf May (ака Май, Майчик, Майонез, May @mayonnaizze or @FAGGOTRON3000).
 """
 
 # =========================
@@ -79,13 +80,8 @@ async def handle_message(message: types.Message):
     user_id = message.from_user.id
     text = message.text
 
-    # В группах реагирует только если упомянули
-    if message.chat.type in ["group", "supergroup"]:
-        if renhanairlest_bot and f"@{renhanairlest_bot}" not in text:
-            return
-
     # 20% шанс игнора (человечность)
-    if random.random() < 0.2:
+    if random.random() < 0.1:
         return
 
 
@@ -114,3 +110,47 @@ async def main():
 
 if __name__ == "__main__":
     asyncio.run(main())
+
+BOT_KEYWORDS = [renhanairlest_bot, "рен", "рениха", "Рен", "ren"]  # добавь свои
+
+@dp.message()
+async def handle_group_by_keyword(message: Message):
+    if not message.text:
+        return
+
+    # работаем только в группах и супергруппах
+    if message.chat.type not in ["group", "supergroup"]:
+        return
+
+    # проверяем, есть ли кодовое слово в сообщении
+    if not any(keyword.lower() in message.text.lower() for keyword in BOT_KEYWORDS):
+        return  # если кодового слова нет — игнорируем
+
+    # удаляем кодовые слова из текста перед отправкой в модель
+    text_for_model = message.text
+    for keyword in BOT_KEYWORDS:
+        text_for_model = text_for_model.replace(keyword, "").strip()
+
+    user_id = message.from_user.id
+
+    # пауза для естественности
+    import asyncio, random
+    await asyncio.sleep(random.randint(1,3))
+
+    # память пользователя
+    if user_id not in memory:
+        memory[user_id] = [{"role": "system", "content": SYSTEM_PROMPT}]
+
+    memory[user_id].append({"role": "user", "content": text_for_model})
+    memory[user_id] = memory[user_id][-12:]
+
+    # запрос в DeepSeek
+    try:
+        reply = await ask_deepseek(memory[user_id])
+    except Exception as e:
+        print("DeepSeek error:", e)
+        reply = "что-то сломалось 💀"
+
+    memory[user_id].append({"role": "assistant", "content": reply})
+
+    await message.reply(reply)
