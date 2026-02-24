@@ -5,6 +5,8 @@ import aiohttp
 from dotenv import load_dotenv
 from aiogram import Bot, Dispatcher, types
 from aiogram.types import Message
+import base64
+from aiogram.types import Message
 
 # Загружаем переменные из .env
 load_dotenv()
@@ -156,3 +158,65 @@ async def handle_group_by_keyword(message: Message):
     await message.reply(reply)
 
 
+@dp.message()
+async def handle_message_universal(message: Message):
+
+    user_id = message.from_user.id
+
+    # 1️⃣ Текст
+    text = message.text if message.text else ""
+
+    # 2️⃣ Фото
+    photo_bytes = None
+    if message.photo:
+        photo = message.photo[-1]  # самое большое фото
+        file = await bot.get_file(photo.file_id)
+        file_path = file.file_path
+        file_url = f"https://api.telegram.org/file/bot{7758779270:AAEfovnO2JaGSwRDYEmEN6Lw-0fsOo_xPKg}/{file_path}"
+
+        async with aiohttp.ClientSession() as session:
+            async with session.get(file_url) as resp:
+                photo_bytes = await resp.read()
+
+    # 3️⃣ Проверяем кодовое слово для групп
+    if message.chat.type in ["group", "supergroup"]:
+        if not any(keyword.lower() in (text.lower() if text else "") for keyword in BOT_KEYWORDS) and not photo_bytes:
+            return  # если нет кодового слова и нет фото — игнорируем
+
+        # убираем кодовое слово из текста
+        for keyword in BOT_KEYWORDS:
+            text = text.replace(keyword, "").strip()
+
+    # 4️⃣ Пауза для естественности
+    import asyncio, random
+    await asyncio.sleep(random.randint(1,3))
+
+    # 5️⃣ Память
+    if user_id not in memory:
+        memory[user_id] = [{"role": "system", "content": SYSTEM_PROMPT}]
+
+    if text:
+        memory[user_id].append({"role": "user", "content": text})
+
+    # Если есть фото — добавляем его
+    if photo_bytes:
+        memory[user_id].append({
+            "role": "user",
+            "content": [
+                {"type": "text", "text": "Опиши это изображение"},
+                {"type": "image_url", "image_url": f"data:image/jpeg;base64,{base64.b64encode(photo_bytes).decode()}"}
+            ]
+        })
+
+    memory[user_id] = memory[user_id][-12:]
+
+    # 6️⃣ Запрос в DeepSeek
+    try:
+        reply = await ask_deepseek(memory[user_id])
+    except Exception as e:
+        print("DeepSeek error:", e)
+        reply = "что-то сломалось 💀"
+
+    memory[user_id].append({"role": "assistant", "content": reply})
+
+    await message.reply(reply)
