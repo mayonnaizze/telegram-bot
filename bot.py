@@ -14,6 +14,7 @@ load_dotenv()
 
 BOT_TOKEN = os.getenv("BOT_TOKEN")
 DEEPSEEK_API_KEY = os.getenv("DEEPSEEK_API_KEY")
+HF_API_KEY = os.getenv("HF_API_KEY")
 BOT_USERNAME = os.getenv("BOT_USERNAME")
 
 if not BOT_TOKEN:
@@ -208,6 +209,7 @@ async def handle_photo(message: Message):
 
     memory[user_id].append({"role": "assistant", "content": reply})
     await message.reply(reply)
+
 
 
 
