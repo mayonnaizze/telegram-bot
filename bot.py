@@ -155,12 +155,8 @@ async def handle_group_by_keyword(message: Message):
         print("DeepSeek error:", e)
         reply = "что-то сломалось 💀"
 
-    memory[user_id].append({"role": "assistant", "content": reply})
-
-    await message.reply(reply)
-
+# --- Функция обращения к HuggingFace для фото ---
 async def analyze_image_hf(image_bytes):
-    """Отправка фото на HuggingFace BLIP-2 для генерации описания"""
     hf_api_url = "https://api-inference.huggingface.co/models/Salesforce/blip2-flan-t5-xl"
     headers = {"Authorization": f"Bearer {HF_API_KEY}"}
     payload = {
@@ -176,39 +172,30 @@ async def analyze_image_hf(image_bytes):
                 return "не смог распознать изображение 😅"
             return result[0]["generated_text"]
 
-@dp.message(lambda message: message.photo)
-async def handle_photo(message: Message):
-    """Обработка фото: анализ через HuggingFace + добавление в память DeepSeek"""
+# --- Универсальный хендлер для текста и фото ---
+@dp.message()
+async def handle_message_universal(message: Message):
     user_id = message.from_user.id
+    text = message.text if message.text else ""
+    photo_bytes = None
 
-    # Получаем фото самого высокого качества
-    photo = message.photo[-1]
-    file = await bot.get_file(photo.file_id)
-    file_url = f"https://api.telegram.org/file/bot{BOT_TOKEN}/{file.file_path}"
-
-    async with aiohttp.ClientSession() as session:
-        async with session.get(file_url) as resp:
-            image_bytes = await resp.read()
-
-    # Отправляем фото на анализ HuggingFace
-    description = await analyze_image_hf(image_bytes)
-    text_for_memory = f"[Фото]: {description}"
-
-    # Добавляем в память пользователя
-    if user_id not in memory:
-        memory[user_id] = [{"role": "system", "content": SYSTEM_PROMPT}]
-    memory[user_id].append({"role": "user", "content": text_for_memory})
-    memory[user_id] = memory[user_id][-12:]
-
-    # Отправляем в DeepSeek для ответа
-    try:
-        reply = await ask_deepseek(memory[user_id])
-    except Exception as e:
-        print("DeepSeek error:", e)
-        reply = "что-то сломалось 💀"
+    # --- Обработка фото ---
+    if message.photo:
+        photo = message.photo[-1]
+        file = await bot.get_file(photo.file_id)
+        file_url = f"https://api.telegram.org/file/bot{BOT_TOKEN}/{file.file_path}"
+        async with aiohttp.ClientSession() as session:
+            async with session.get(file_url) as resp:
+                photo_bytes = await resp.read()
+        # Отправляем фото на анализ HuggingFace
+        description = await analyze_image_hf(photo_bytes)
+        text = f"[Фото]: {description}" + (" " + text if text else "")
 
     memory[user_id].append({"role": "assistant", "content": reply})
+
     await message.reply(reply)
+
+
 
 
 
